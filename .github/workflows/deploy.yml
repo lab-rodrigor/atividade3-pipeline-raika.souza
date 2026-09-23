@@ -8,10 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  # TODO: troque pelo seu slug, o começo do seu e-mail com ponto virando hífen.
-  SLUG: SEU-SLUG
-  # TODO: a primeira porta da sua faixa. Veja em `gr-docker ajuda`.
-  PORTA: 230N0
+  SLUG: raika-souza
+  PORTA: 23260
 
 jobs:
   deploy:
@@ -28,24 +26,20 @@ jobs:
 
       - name: Derrubar a topologia antiga
         run: |
-          # TODO: apague os três containers, se existirem.
-          # Dica: o passo não pode falhar quando eles ainda não existem.
-          echo "TODO"
+          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker rm -f front api banco 2>/dev/null || true
 
       - name: Criar rede e volume
         run: |
-          # TODO: as duas redes e o volume. A rede do banco é interna.
-          # Dica: criar o que já existe devolve erro. Trate isso.
-          echo "TODO"
+          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker network create dados --internal 2>/dev/null || true
+          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker network create web 2>/dev/null || true
+          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker volume create pgdata 2>/dev/null || true
 
       - name: Subir banco, API e front
         run: |
-          # TODO: os três containers, na ordem certa.
-          # O front precisa receber o commit que o deploy publicou:
-          #   -e DEPLOY_SHA=${{ github.sha }}
-          echo "TODO"
+          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run banco -e POSTGRES_PASSWORD=${{ secrets.DB_SENHA }}
+          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run api -e DB_SENHA=${{ secrets.DB_SENHA }}
+          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run front -e DEPLOY_SHA=${{ github.sha }}
 
       - name: Conferir que subiu
         run: |
-          # TODO: pergunte ao servidor se a listagem responde.
-          echo "TODO"
+          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker meus
