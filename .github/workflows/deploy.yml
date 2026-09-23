@@ -19,7 +19,9 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy
+          # Remove retornos de carro e garante que termina com quebra de linha
           tr -d '\r' < ~/.ssh/deploy > ~/.ssh/deploy_clean
+          echo "" >> ~/.ssh/deploy_clean
           mv ~/.ssh/deploy_clean ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
           ssh-keyscan -p 22126 -H gr.lab.ayty.org >> ~/.ssh/known_hosts
