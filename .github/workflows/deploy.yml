@@ -24,6 +24,13 @@ jobs:
           chmod 600 ~/.ssh/deploy
           ssh-keyscan -p 22126 -H gr.lab.ayty.org >> ~/.ssh/known_hosts
 
+      - name: Diagnosticar chave
+        run: |
+          echo "Tamanho da chave:"
+          wc -c ~/.ssh/deploy
+          echo "Primeira linha:"
+          head -n 1 ~/.ssh/deploy
+
       - name: Derrubar a topologia antiga
         run: |
           ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker rm -f front api banco 2>/dev/null || true
