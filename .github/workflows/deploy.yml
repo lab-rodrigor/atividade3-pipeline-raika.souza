@@ -18,11 +18,11 @@ jobs:
       - name: Preparar a chave de deploy
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy
-          # Remove retornos de carro e garante que termina com quebra de linha
-          tr -d '\r' < ~/.ssh/deploy > ~/.ssh/deploy_clean
-          echo "" >> ~/.ssh/deploy_clean
-          mv ~/.ssh/deploy_clean ~/.ssh/deploy
+          python3 -c '
+          key = """${{ secrets.DEPLOY_KEY }}"""
+          with open("/home/runner/.ssh/deploy", "w", encoding="utf-8", newline="\n") as f:
+              f.write(key.strip() + "\n")
+          '
           chmod 600 ~/.ssh/deploy
           ssh-keyscan -p 22126 -H gr.lab.ayty.org >> ~/.ssh/known_hosts
 
