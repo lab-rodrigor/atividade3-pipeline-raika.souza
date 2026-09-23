@@ -22,7 +22,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
-          ssh-keyscan -H gr.lab.ayty.org >> ~/.ssh/known_hosts
+          ssh-keyscan -p 22126 -H gr.lab.ayty.org >> ~/.ssh/known_hosts
 
       - name: Derrubar a topologia antiga
         run: |
