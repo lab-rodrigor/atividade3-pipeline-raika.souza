@@ -17,14 +17,11 @@ jobs:
 
       - name: Preparar a chave de deploy
         run: |
-          mkdir -p ~/.ssh
-          python3 -c '
-          key = """${{ secrets.DEPLOY_KEY }}"""
-          with open("/home/runner/.ssh/deploy", "w", encoding="utf-8", newline="\n") as f:
-              f.write(key.strip() + "\n")
-          '
-          chmod 600 ~/.ssh/deploy
-          ssh-keyscan -p ${{ env.PORTA }} -H gr.lab.ayty.org >> ~/.ssh/known_hosts
+          mkdir -p /home/runner/.ssh
+          chmod 700 /home/runner/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > /home/runner/.ssh/deploy
+          chmod 600 /home/runner/.ssh/deploy
+          ssh-keyscan -p ${{ env.PORTA }} -H gr.lab.ayty.org >> /home/runner/.ssh/known_hosts
 
       - name: Diagnosticar chave
         run: |
