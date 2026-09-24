@@ -19,7 +19,6 @@ jobs:
         shell: bash
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-          PORTA: ${{ env.PORTA }}
         run: |
           set -Eeuo pipefail
           test -n "$DEPLOY_KEY" || {
@@ -33,12 +32,6 @@ jobs:
             sed 's/\r$//' > "$HOME/.ssh/deploy"
           chmod 600 "$HOME/.ssh/deploy"
 
-          timeout 15 ssh-keyscan -T 10 -p "$PORTA" -H gr.lab.ayty.org \
-            > "$HOME/.ssh/known_hosts" || {
-              echo "::error::Não foi possível acessar gr.lab.ayty.org na porta $PORTA."
-              exit 1
-            }
-
           ssh-keygen -y -f "$HOME/.ssh/deploy" >/dev/null || {
             echo "::error::DEPLOY_KEY não contém uma chave privada SSH válida."
             exit 1
@@ -51,6 +44,8 @@ jobs:
         run: |
           set -Eeuo pipefail
           ssh -i "$HOME/.ssh/deploy" \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
             -o BatchMode=yes \
             -o ConnectTimeout=15 \
             -p "$PORTA" \
@@ -62,16 +57,16 @@ jobs:
           PORTA: ${{ env.PORTA }}
           SLUG: ${{ env.SLUG }}
         run: |
-          ssh -i "$HOME/.ssh/deploy" -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker rm -f front api banco 2>/dev/null || true
+          ssh -i "$HOME/.ssh/deploy" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker rm -f front api banco 2>/dev/null || true
 
       - name: Criar rede e volume
         env:
           PORTA: ${{ env.PORTA }}
           SLUG: ${{ env.SLUG }}
         run: |
-          ssh -i "$HOME/.ssh/deploy" -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker network create dados --internal 2>/dev/null || true
-          ssh -i "$HOME/.ssh/deploy" -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker network create web 2>/dev/null || true
-          ssh -i "$HOME/.ssh/deploy" -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker volume create pgdata 2>/dev/null || true
+          ssh -i "$HOME/.ssh/deploy" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker network create dados --internal 2>/dev/null || true
+          ssh -i "$HOME/.ssh/deploy" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker network create web 2>/dev/null || true
+          ssh -i "$HOME/.ssh/deploy" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker volume create pgdata 2>/dev/null || true
 
       - name: Subir banco, API e front
         env:
@@ -83,6 +78,8 @@ jobs:
           set -Eeuo pipefail
           SSH_OPTS=(
             -i "$HOME/.ssh/deploy"
+            -o StrictHostKeyChecking=no
+            -o UserKnownHostsFile=/dev/null
             -o BatchMode=yes
             -o ConnectTimeout=15
             -p "$PORTA"
@@ -106,4 +103,4 @@ jobs:
           PORTA: ${{ env.PORTA }}
           SLUG: ${{ env.SLUG }}
         run: |
-          ssh -i "$HOME/.ssh/deploy" -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker meus
+          ssh -i "$HOME/.ssh/deploy" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker meus
