@@ -15,43 +15,95 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Preparar a chave de deploy
-        run: |
-          mkdir -p ~/.ssh
-          python3 -c '
-          import os
-          key = os.environ["DEPLOY_KEY"]
-          with open(os.path.expanduser("~/.ssh/deploy"), "w", encoding="utf-8", newline="\n") as f:
-              f.write(key.strip() + "\n")
-          '
-          chmod 600 ~/.ssh/deploy
-          ssh-keyscan -p ${{ env.PORTA }} -H gr.lab.ayty.org >> ~/.ssh/known_hosts
+      - name: Preparar SSH
+        shell: bash
         env:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-
-      - name: Diagnosticar chave
+          PORTA: ${{ env.PORTA }}
         run: |
-          echo "Tamanho da chave:"
-          wc -c ~/.ssh/deploy
-          echo "Primeira linha:"
-          head -n 1 ~/.ssh/deploy
+          set -Eeuo pipefail
+          test -n "$DEPLOY_KEY" || {
+            echo "::error::O segredo DEPLOY_KEY está vazio ou não está disponível."
+            exit 1
+          }
+
+          install -d -m 700 "$HOME/.ssh"
+
+          printf '%s\n' "$DEPLOY_KEY" |
+            sed 's/\r$//' > "$HOME/.ssh/deploy"
+          chmod 600 "$HOME/.ssh/deploy"
+
+          timeout 15 ssh-keyscan -T 10 -p "$PORTA" -H gr.lab.ayty.org \
+            > "$HOME/.ssh/known_hosts" || {
+              echo "::error::Não foi possível acessar gr.lab.ayty.org na porta $PORTA."
+              exit 1
+            }
+
+          ssh-keygen -y -f "$HOME/.ssh/deploy" >/dev/null || {
+            echo "::error::DEPLOY_KEY não contém uma chave privada SSH válida."
+            exit 1
+          }
+
+      - name: Testar conexão SSH
+        env:
+          PORTA: ${{ env.PORTA }}
+          SLUG: ${{ env.SLUG }}
+        run: |
+          set -Eeuo pipefail
+          ssh -i "$HOME/.ssh/deploy" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=15 \
+            -p "$PORTA" \
+            "gr-${SLUG}@gr.lab.ayty.org" \
+            'echo "SSH OK"'
 
       - name: Derrubar a topologia antiga
+        env:
+          PORTA: ${{ env.PORTA }}
+          SLUG: ${{ env.SLUG }}
         run: |
-          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker rm -f front api banco 2>/dev/null || true
+          ssh -i "$HOME/.ssh/deploy" -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker rm -f front api banco 2>/dev/null || true
 
       - name: Criar rede e volume
+        env:
+          PORTA: ${{ env.PORTA }}
+          SLUG: ${{ env.SLUG }}
         run: |
-          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker network create dados --internal 2>/dev/null || true
-          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker network create web 2>/dev/null || true
-          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker volume create pgdata 2>/dev/null || true
+          ssh -i "$HOME/.ssh/deploy" -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker network create dados --internal 2>/dev/null || true
+          ssh -i "$HOME/.ssh/deploy" -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker network create web 2>/dev/null || true
+          ssh -i "$HOME/.ssh/deploy" -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker volume create pgdata 2>/dev/null || true
 
       - name: Subir banco, API e front
+        env:
+          PORTA: ${{ env.PORTA }}
+          SLUG: ${{ env.SLUG }}
+          DB_SENHA: ${{ secrets.DB_SENHA }}
+          DEPLOY_SHA: ${{ github.sha }}
         run: |
-          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run banco -e POSTGRES_PASSWORD=${{ secrets.DB_SENHA }}
-          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run api -e DB_SENHA=${{ secrets.DB_SENHA }}
-          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run front -e DEPLOY_SHA=${{ github.sha }}
+          set -Eeuo pipefail
+          SSH_OPTS=(
+            -i "$HOME/.ssh/deploy"
+            -o BatchMode=yes
+            -o ConnectTimeout=15
+            -p "$PORTA"
+          )
+          HOST="gr-${SLUG}@gr.lab.ayty.org"
+
+          echo "Subindo banco"
+          ssh "${SSH_OPTS[@]}" "$HOST" \
+            "gr-docker run banco -e POSTGRES_PASSWORD='${DB_SENHA}'"
+
+          echo "Subindo API"
+          ssh "${SSH_OPTS[@]}" "$HOST" \
+            "gr-docker run api -e DB_SENHA='${DB_SENHA}'"
+
+          echo "Subindo front"
+          ssh "${SSH_OPTS[@]}" "$HOST" \
+            "gr-docker run front -e DEPLOY_SHA='${DEPLOY_SHA}'"
 
       - name: Conferir que subiu
+        env:
+          PORTA: ${{ env.PORTA }}
+          SLUG: ${{ env.SLUG }}
         run: |
-          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker meus
+          ssh -i "$HOME/.ssh/deploy" -o BatchMode=yes -o ConnectTimeout=15 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker meus
