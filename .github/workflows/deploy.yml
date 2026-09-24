@@ -24,7 +24,7 @@ jobs:
               f.write(key.strip() + "\n")
           '
           chmod 600 ~/.ssh/deploy
-          ssh-keyscan -p 22126 -H gr.lab.ayty.org >> ~/.ssh/known_hosts
+          ssh-keyscan -p ${{ env.PORTA }} -H gr.lab.ayty.org >> ~/.ssh/known_hosts
 
       - name: Diagnosticar chave
         run: |
@@ -35,20 +35,20 @@ jobs:
 
       - name: Derrubar a topologia antiga
         run: |
-          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker rm -f front api banco 2>/dev/null || true
+          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker rm -f front api banco 2>/dev/null || true
 
       - name: Criar rede e volume
         run: |
-          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker network create dados --internal 2>/dev/null || true
-          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker network create web 2>/dev/null || true
-          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker volume create pgdata 2>/dev/null || true
+          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker network create dados --internal 2>/dev/null || true
+          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker network create web 2>/dev/null || true
+          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker volume create pgdata 2>/dev/null || true
 
       - name: Subir banco, API e front
         run: |
-          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run banco -e POSTGRES_PASSWORD=${{ secrets.DB_SENHA }}
-          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run api -e DB_SENHA=${{ secrets.DB_SENHA }}
-          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run front -e DEPLOY_SHA=${{ github.sha }}
+          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run banco -e POSTGRES_PASSWORD=${{ secrets.DB_SENHA }}
+          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run api -e DB_SENHA=${{ secrets.DB_SENHA }}
+          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker run front -e DEPLOY_SHA=${{ github.sha }}
 
       - name: Conferir que subiu
         run: |
-          ssh -i ~/.ssh/deploy -p 22126 gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker meus
+          ssh -i ~/.ssh/deploy -p ${{ env.PORTA }} gr-${{ env.SLUG }}@gr.lab.ayty.org gr-docker meus
