@@ -37,42 +37,7 @@ jobs:
             exit 1
           }
 
-      - name: Testar conexão SSH
-        env:
-          PORTA: ${{ env.PORTA }}
-          SLUG: ${{ env.SLUG }}
-        run: |
-          set -Eeuo pipefail
-          ssh -T \
-            -i "$HOME/.ssh/deploy" \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            -o BatchMode=yes \
-            -o ConnectTimeout=30 \
-            -p "$PORTA" \
-            "gr-${SLUG}@gr.lab.ayty.org" \
-            gr-docker meus
-
-      - name: Derrubar a topologia antiga
-        env:
-          PORTA: ${{ env.PORTA }}
-          SLUG: ${{ env.SLUG }}
-        run: |
-          set -Eeuo pipefail
-          ssh -T -i "$HOME/.ssh/deploy" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=30 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker rm -f front api banco 2>/dev/null || true
-
-      - name: Criar rede e volume
-        env:
-          PORTA: ${{ env.PORTA }}
-          SLUG: ${{ env.SLUG }}
-        run: |
-          set -Eeuo pipefail
-          ssh -T -i "$HOME/.ssh/deploy" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=30 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker network create dados --internal 2>/dev/null || true
-          ssh -T -i "$HOME/.ssh/deploy" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=30 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker network create web 2>/dev/null || true
-          ssh -T -i "$HOME/.ssh/deploy" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=30 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker volume create pgdata 2>/dev/null || true
-
-      - name: Subir banco, API e front
+      - name: Executar Deploy via SSH
         env:
           PORTA: ${{ env.PORTA }}
           SLUG: ${{ env.SLUG }}
@@ -88,54 +53,26 @@ jobs:
             -o UserKnownHostsFile=/dev/null
             -o BatchMode=yes
             -o ConnectTimeout=30
-            -o ConnectionAttempts=3
-            -o ServerAliveInterval=15
-            -o ServerAliveCountMax=3
             -p "$PORTA"
           )
           HOST="gr-${SLUG}@gr.lab.ayty.org"
 
-          run_remote() {
-            local command="$1"
-            local attempt
-            local status
+          echo "Derrubando topologia antiga"
+          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker rm -f front api banco 2>/dev/null || true"
 
-            for attempt in 1 2 3; do
-              set +e
-              ssh "${SSH_OPTS[@]}" "$HOST" "$command"
-              status=$?
-              set -e
-
-              if [ "$status" -eq 0 ]; then
-                return 0
-              fi
-
-              if [ "$status" -ne 255 ]; then
-                echo "::error::Comando remoto falhou com erro de aplicação."
-                return "$status"
-              fi
-
-              echo "Conexão SSH instável. Nova tentativa em 10 segundos..."
-              sleep 10
-            done
-
-            echo "::error::Não foi possível conectar a $HOST na porta $PORTA após 3 tentativas."
-            return 1
-          }
+          echo "Criando redes e volume"
+          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker network create dados --internal 2>/dev/null || true"
+          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker network create web 2>/dev/null || true"
+          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker volume create pgdata 2>/dev/null || true"
 
           echo "Subindo banco"
-          run_remote "gr-docker run banco postgres -e POSTGRES_PASSWORD='${DB_SENHA}'"
+          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker run banco -e POSTGRES_PASSWORD='${DB_SENHA}'"
 
           echo "Subindo API"
-          run_remote "gr-docker run api -e DB_SENHA='${DB_SENHA}'"
+          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker run api -e DB_SENHA='${DB_SENHA}'"
 
           echo "Subindo front"
-          run_remote "gr-docker run front -e DEPLOY_SHA='${DEPLOY_SHA}'"
+          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker run front -e DEPLOY_SHA='${DEPLOY_SHA}'"
 
-      - name: Conferir que subiu
-        env:
-          PORTA: ${{ env.PORTA }}
-          SLUG: ${{ env.SLUG }}
-        run: |
-          set -Eeuo pipefail
-          ssh -T -i "$HOME/.ssh/deploy" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=30 -p "$PORTA" "gr-${SLUG}@gr.lab.ayty.org" gr-docker meus
+          echo "Conferindo containers ativos"
+          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker meus"
