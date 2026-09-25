@@ -123,8 +123,8 @@ jobs:
             return 1
           }
 
-          echo "Subindo banco (postgres)"
-          run_remote "gr-docker run banco -e POSTGRES_PASSWORD='${DB_SENHA}'"
+          echo "Subindo banco"
+          run_remote "gr-docker run banco postgres -e POSTGRES_PASSWORD='${DB_SENHA}'"
 
           echo "Subindo API"
           run_remote "gr-docker run api -e DB_SENHA='${DB_SENHA}'"
