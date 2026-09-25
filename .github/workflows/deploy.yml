@@ -1,3 +1,4 @@
+```yaml
 name: deploy
 
 on:
@@ -12,6 +13,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +23,7 @@ jobs:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
         run: |
           set -Eeuo pipefail
+
           test -n "$DEPLOY_KEY" || {
             echo "::error::O segredo DEPLOY_KEY está vazio ou não está disponível."
             exit 1
@@ -30,6 +33,7 @@ jobs:
 
           printf '%s\n' "$DEPLOY_KEY" |
             sed 's/\r$//' > "$HOME/.ssh/deploy"
+
           chmod 600 "$HOME/.ssh/deploy"
 
           ssh-keygen -y -f "$HOME/.ssh/deploy" >/dev/null || {
@@ -43,8 +47,10 @@ jobs:
           SLUG: ${{ env.SLUG }}
           DB_SENHA: ${{ secrets.DB_SENHA }}
           DEPLOY_SHA: ${{ github.sha }}
+
         run: |
           set -Eeuo pipefail
+
           SSH_OPTS=(
             -T
             -i "$HOME/.ssh/deploy"
@@ -55,6 +61,7 @@ jobs:
             -o ConnectTimeout=30
             -p "$PORTA"
           )
+
           HOST="gr-${SLUG}@gr.lab.ayty.org"
 
           ssh_retry() {
@@ -67,7 +74,7 @@ jobs:
               fi
 
               if [ "$attempt" -lt 3 ]; then
-                echo "Conexão SSH instável. Tentando novamente em 10 segundos..."
+                echo "Falha na execução remota; tentando novamente em 10 segundos..."
                 sleep 10
               fi
             done
@@ -76,27 +83,41 @@ jobs:
             return 1
           }
 
+          ssh_best_effort() {
+            local command="$1"
+
+            ssh "${SSH_OPTS[@]}" "$HOST" "$command" || true
+          }
+
           echo "Derrubando topologia antiga de forma segura"
-          ssh_retry "gr-docker stop front 2>/dev/null || true"
-          ssh_retry "gr-docker rm front 2>/dev/null || true"
-          ssh_retry "gr-docker stop api 2>/dev/null || true"
-          ssh_retry "gr-docker rm api 2>/dev/null || true"
-          ssh_retry "gr-docker stop banco 2>/dev/null || true"
-          ssh_retry "gr-docker rm banco 2>/dev/null || true"
+
+          ssh_best_effort "gr-docker stop front"
+          ssh_best_effort "gr-docker rm front"
+
+          ssh_best_effort "gr-docker stop api"
+          ssh_best_effort "gr-docker rm api"
+
+          ssh_best_effort "gr-docker stop banco"
+          ssh_best_effort "gr-docker rm banco"
 
           echo "Criando redes e volume"
-          ssh_retry "gr-docker network create dados --internal 2>/dev/null || true"
-          ssh_retry "gr-docker network create web 2>/dev/null || true"
-          ssh_retry "gr-docker volume create pgdata 2>/dev/null || true"
+
+          ssh_best_effort "gr-docker network create dados --internal"
+          ssh_best_effort "gr-docker network create web"
+          ssh_best_effort "gr-docker volume create pgdata"
 
           echo "Subindo banco"
+
           ssh_retry "gr-docker run banco -e POSTGRES_PASSWORD='${DB_SENHA}'"
 
           echo "Subindo API"
+
           ssh_retry "gr-docker run api -e DB_SENHA='${DB_SENHA}'"
 
           echo "Subindo front"
+
           ssh_retry "gr-docker run front -e DEPLOY_SHA='${DEPLOY_SHA}'"
 
           echo "Conferindo containers ativos"
+
           ssh_retry "gr-docker meus"
