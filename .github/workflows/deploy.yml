@@ -67,7 +67,7 @@ jobs:
               fi
 
               if [ "$attempt" -lt 3 ]; then
-                echo "Falha na execução remota; tentando novamente em 10 segundos..."
+                echo "Conexão SSH instável. Tentando novamente em 10 segundos..."
                 sleep 10
               fi
             done
@@ -77,12 +77,12 @@ jobs:
           }
 
           echo "Derrubando topologia antiga de forma segura"
-          ssh_retry '
-            for container in front api banco; do
-              gr-docker stop "$container" >/dev/null 2>&1 || true
-              gr-docker rm "$container" >/dev/null 2>&1 || true
-            done
-          '
+          ssh_retry "gr-docker stop front 2>/dev/null || true"
+          ssh_retry "gr-docker rm front 2>/dev/null || true"
+          ssh_retry "gr-docker stop api 2>/dev/null || true"
+          ssh_retry "gr-docker rm api 2>/dev/null || true"
+          ssh_retry "gr-docker stop banco 2>/dev/null || true"
+          ssh_retry "gr-docker rm banco 2>/dev/null || true"
 
           echo "Criando redes e volume"
           ssh_retry "gr-docker network create dados --internal 2>/dev/null || true"
