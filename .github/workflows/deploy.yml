@@ -43,6 +43,7 @@ jobs:
           SLUG: ${{ env.SLUG }}
         run: |
           set -Eeuo pipefail
+          # A chave restrita só aceita rodar gr-docker, então testamos chamando o gr-docker diretamente
           ssh -i "$HOME/.ssh/deploy" \
             -o StrictHostKeyChecking=no \
             -o UserKnownHostsFile=/dev/null \
@@ -50,7 +51,7 @@ jobs:
             -o ConnectTimeout=15 \
             -p "$PORTA" \
             "gr-${SLUG}@gr.lab.ayty.org" \
-            'echo "SSH OK"'
+            gr-docker meus
 
       - name: Derrubar a topologia antiga
         env:
