@@ -7,7 +7,7 @@ on:
 
 env:
   SLUG: raika-souza
-  PORTA: 22
+  PORTA: 23260
 
 jobs:
   deploy:
@@ -16,107 +16,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Preparar SSH
-        shell: bash
-        env:
-          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+      - name: Preparar a chave de deploy
         run: |
-          set -Eeuo pipefail
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H gr.lab.ayty.org >> ~/.ssh/known_hosts
 
-          test -n "$DEPLOY_KEY" || {
-            echo "::error::O segredo DEPLOY_KEY está vazio ou não está disponível."
-            exit 1
-          }
+      - name: Derrubar a topologia antiga
+        run: |
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker rm front" || true
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker rm api" || true
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker rm banco" || true
 
-          install -d -m 700 "$HOME/.ssh"
+      - name: Criar rede e volume
+        run: |
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker network create dados --interna" || true
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker network create web" || true
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker volume create pgdata" || true
 
-          printf '%s\n' "$DEPLOY_KEY" |
-            sed 's/\r$//' > "$HOME/.ssh/deploy"
-
-          chmod 600 "$HOME/.ssh/deploy"
-
-          ssh-keygen -y -f "$HOME/.ssh/deploy" >/dev/null || {
-            echo "::error::DEPLOY_KEY não contém uma chave privada SSH válida."
-            exit 1
-          }
-
-      - name: Executar Deploy via SSH com Retry
+      - name: Subir banco, API e front
         env:
-          PORTA: ${{ env.PORTA }}
-          SLUG: ${{ env.SLUG }}
           DB_SENHA: ${{ secrets.DB_SENHA }}
-          DEPLOY_SHA: ${{ github.sha }}
-
         run: |
-          set -Eeuo pipefail
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org \
+            "gr-docker run postgres:17-alpine --name banco \
+            -e POSTGRES_PASSWORD='${DB_SENHA}' \
+            -e POSTGRES_DB=pokedex \
+            --network dados \
+            -v pgdata:/var/lib/postgresql/data"
 
-          SSH_OPTS=(
-            -T
-            -i "$HOME/.ssh/deploy"
-            -o IdentitiesOnly=yes
-            -o StrictHostKeyChecking=no
-            -o UserKnownHostsFile=/dev/null
-            -o BatchMode=yes
-            -o ConnectTimeout=30
-            -p "$PORTA"
-          )
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org \
+            "gr-docker run gr-atv2-api:1 --name api \
+            -e POSTGRES_HOST=gr-${{ env.SLUG }}-banco \
+            -e POSTGRES_DB=pokedex \
+            -e POSTGRES_PASSWORD='${DB_SENHA}' \
+            --network dados"
 
-          HOST="gr-${SLUG}@gr.lab.ayty.org"
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org \
+            "gr-docker network connect web api"
 
-          ssh_retry() {
-            local command="$1"
-            local attempt
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org \
+            "gr-docker run gr-atv2-front:1 --name front \
+            -e API=gr-${{ env.SLUG }}-api \
+            -e DEPLOY_SHA=${{ github.sha }} \
+            --network web \
+            -p ${{ env.PORTA }}:80"
 
-            for attempt in 1 2 3; do
-              if ssh "${SSH_OPTS[@]}" "$HOST" "$command"; then
-                return 0
-              fi
-
-              if [ "$attempt" -lt 3 ]; then
-                echo "Falha na execução remota; tentando novamente em 10 segundos..."
-                sleep 10
-              fi
-            done
-
-            echo "::error::Falha ao executar comando remoto após 3 tentativas."
-            return 1
-          }
-
-          ssh_best_effort() {
-            local command="$1"
-
-            ssh "${SSH_OPTS[@]}" "$HOST" "$command" || true
-          }
-
-          echo "Derrubando topologia antiga de forma segura"
-
-          ssh_best_effort "gr-docker stop front"
-          ssh_best_effort "gr-docker rm front"
-
-          ssh_best_effort "gr-docker stop api"
-          ssh_best_effort "gr-docker rm api"
-
-          ssh_best_effort "gr-docker stop banco"
-          ssh_best_effort "gr-docker rm banco"
-
-          echo "Criando redes e volume"
-
-          ssh_best_effort "gr-docker network create dados --internal"
-          ssh_best_effort "gr-docker network create web"
-          ssh_best_effort "gr-docker volume create pgdata"
-
-          echo "Subindo banco"
-
-          ssh_retry "gr-docker run banco -e POSTGRES_PASSWORD='${DB_SENHA}'"
-
-          echo "Subindo API"
-
-          ssh_retry "gr-docker run api -e DB_SENHA='${DB_SENHA}'"
-
-          echo "Subindo front"
-
-          ssh_retry "gr-docker run front -e DEPLOY_SHA='${DEPLOY_SHA}'"
-
-          echo "Conferindo containers ativos"
-
-          ssh_retry "gr-docker meus"
+      - name: Conferir que subiu
+        run: |
+          curl --fail --silent --show-error \
+            "http://gr.lab.ayty.org:${{ env.PORTA }}/api/pokemons"
