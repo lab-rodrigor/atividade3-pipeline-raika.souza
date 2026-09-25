@@ -37,13 +37,13 @@ jobs:
             exit 1
           }
 
-      - name: Testar conexão SSH
+      - name: Testar conexão SSH (Verboso)
         env:
           PORTA: ${{ env.PORTA }}
           SLUG: ${{ env.SLUG }}
         run: |
           set -Eeuo pipefail
-          ssh -T \
+          ssh -vvv -T \
             -i "$HOME/.ssh/deploy" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=no \
