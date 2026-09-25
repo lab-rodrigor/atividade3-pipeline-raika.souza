@@ -98,10 +98,21 @@ jobs:
           run_remote() {
             local command="$1"
             local attempt
+            local status
 
             for attempt in 1 2 3; do
-              if ssh "${SSH_OPTS[@]}" "$HOST" "$command"; then
+              set +e
+              ssh "${SSH_OPTS[@]}" "$HOST" "$command"
+              status=$?
+              set -e
+
+              if [ "$status" -eq 0 ]; then
                 return 0
+              fi
+
+              if [ "$status" -ne 255 ]; then
+                echo "::error::Comando remoto falhou com erro de aplicação."
+                return "$status"
               fi
 
               echo "Conexão SSH instável. Nova tentativa em 10 segundos..."
@@ -112,7 +123,7 @@ jobs:
             return 1
           }
 
-          echo "Subindo banco"
+          echo "Subindo banco (postgres)"
           run_remote "gr-docker run banco -e POSTGRES_PASSWORD='${DB_SENHA}'"
 
           echo "Subindo API"
