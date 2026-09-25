@@ -76,23 +76,20 @@ jobs:
 
       - name: Verificar API
         run: |
-          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker inspect api"
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker ps"
           ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker logs api"
-          
+
       - name: Conferir que subiu
         run: |
           for i in {1..12}; do
             echo "Tentativa $i de 12..."
-
             if curl --fail --silent --show-error \
               "http://gr.lab.ayty.org:${{ env.PORTA }}/api/pokemons"; then
               echo "Listagem respondeu corretamente!"
               exit 0
             fi
-
             echo "Ainda não respondeu. Aguardando 5 segundos..."
             sleep 5
           done
-
           echo "A aplicação não respondeu após 60 segundos."
           exit 1
