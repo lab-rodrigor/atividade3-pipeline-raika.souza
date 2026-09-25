@@ -77,12 +77,12 @@ jobs:
           }
 
           echo "Derrubando topologia antiga de forma segura"
-          ssh_retry "gr-docker stop front >/dev/null 2>&1 || true"
-          ssh_retry "gr-docker rm front >/dev/null 2>&1 || true"
-          ssh_retry "gr-docker stop api >/dev/null 2>&1 || true"
-          ssh_retry "gr-docker rm api >/dev/null 2>&1 || true"
-          ssh_retry "gr-docker stop banco >/dev/null 2>&1 || true"
-          ssh_retry "gr-docker rm banco >/dev/null 2>&1 || true"
+          ssh_retry "gr-docker stop front || true"
+          ssh_retry "gr-docker rm front || true"
+          ssh_retry "gr-docker stop api || true"
+          ssh_retry "gr-docker rm api || true"
+          ssh_retry "gr-docker stop banco || true"
+          ssh_retry "gr-docker rm banco || true"
 
           echo "Criando redes e volume"
           ssh_retry "gr-docker network create dados --internal 2>/dev/null || true"
