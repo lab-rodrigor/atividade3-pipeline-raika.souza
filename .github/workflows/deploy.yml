@@ -67,6 +67,13 @@ jobs:
             -e DEPLOY_SHA=${{ github.sha }} \
             --network web \
             -p ${{ env.PORTA }}:80"
+            
+            
+      - name: Verificar containers e redes
+        run: |
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker ps"
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker network inspect web"
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker network inspect dados"      
 
       - name: Conferir que subiu
         run: |
