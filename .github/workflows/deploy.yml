@@ -57,10 +57,14 @@ jobs:
           )
           HOST="gr-${SLUG}@gr.lab.ayty.org"
 
-          echo "Derrubando topologia antiga"
-          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker rm -f front 2>/dev/null || true"
-          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker rm -f api 2>/dev/null || true"
-          ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker rm -f banco 2>/dev/null || true"
+          echo "Derrubando topologia antiga de forma segura"
+          for container in front api banco; do
+            ssh "${SSH_OPTS[@]}" "$HOST" \
+              "gr-docker stop $container 2>/dev/null || true"
+
+            ssh "${SSH_OPTS[@]}" "$HOST" \
+              "gr-docker rm $container 2>/dev/null || true"
+          done
 
           echo "Criando redes e volume"
           ssh "${SSH_OPTS[@]}" "$HOST" "gr-docker network create dados --internal 2>/dev/null || true"
