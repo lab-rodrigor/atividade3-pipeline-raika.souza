@@ -75,6 +75,11 @@ jobs:
           ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker network inspect web"
           ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker network inspect dados"      
 
+      - name: Verificar API
+        run: |
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker inspect api"
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker logs api"
+          
       - name: Conferir que subiu
         run: |
           for i in {1..12}; do
