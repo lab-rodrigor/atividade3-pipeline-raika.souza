@@ -70,5 +70,18 @@ jobs:
 
       - name: Conferir que subiu
         run: |
-          curl --fail --silent --show-error \
-            "http://gr.lab.ayty.org:${{ env.PORTA }}/api/pokemons"
+          for i in {1..12}; do
+            echo "Tentativa $i de 12..."
+
+            if curl --fail --silent --show-error \
+              "http://gr.lab.ayty.org:${{ env.PORTA }}/api/pokemons"; then
+              echo "Listagem respondeu corretamente!"
+              exit 0
+            fi
+
+            echo "Ainda não respondeu. Aguardando 5 segundos..."
+            sleep 5
+          done
+
+          echo "A aplicação não respondeu após 60 segundos."
+          exit 1
