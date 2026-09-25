@@ -102,7 +102,7 @@ jobs:
             for attempt in 1 2 3; do
               if ssh "${SSH_OPTS[@]}" "$HOST" "$command"; then
                 return 0
-              end
+              fi
 
               echo "Conexão SSH instável. Nova tentativa em 10 segundos..."
               sleep 10
