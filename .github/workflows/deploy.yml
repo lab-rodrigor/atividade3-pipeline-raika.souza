@@ -7,7 +7,7 @@ on:
 
 env:
   SLUG: raika-souza
-  PORTA: 23260
+  PORTA: 22
 
 jobs:
   deploy:
@@ -37,13 +37,13 @@ jobs:
             exit 1
           }
 
-      - name: Testar conexão SSH (Verboso)
+      - name: Testar conexão SSH
         env:
           PORTA: ${{ env.PORTA }}
           SLUG: ${{ env.SLUG }}
         run: |
           set -Eeuo pipefail
-          ssh -vvv -T \
+          ssh -T \
             -i "$HOME/.ssh/deploy" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=no \
