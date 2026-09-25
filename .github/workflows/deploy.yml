@@ -31,7 +31,6 @@ jobs:
           ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker rm api" || true
           ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker stop banco" || true
           ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker rm banco" || true
-          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker volume rm pgdata" || true 
 
       - name: Criar rede e volume
         run: |
@@ -45,7 +44,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org \
             "gr-docker run postgres:17-alpine --name banco \
-            -e POSTGRES_PASSWORD='${DB_SENHA}' \
+            -e POSTGRES_PASSWORD=${DB_SENHA} \
             -e POSTGRES_DB=pokedex \
             --network dados \
             -v pgdata:/var/lib/postgresql/data"
@@ -54,7 +53,7 @@ jobs:
             "gr-docker run gr-atv2-api:1 --name api \
             -e POSTGRES_HOST=gr-${{ env.SLUG }}-banco \
             -e POSTGRES_DB=pokedex \
-            -e POSTGRES_PASSWORD='${DB_SENHA}' \
+            -e POSTGRES_PASSWORD=${DB_SENHA} \
             --network dados"
 
           ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org \
@@ -66,13 +65,12 @@ jobs:
             -e DEPLOY_SHA=${{ github.sha }} \
             --network web \
             -p ${{ env.PORTA }}:80"
-            
-            
+
       - name: Verificar containers e redes
         run: |
           ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker ps"
           ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker network inspect web"
-          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker network inspect dados"      
+          ssh -i ~/.ssh/deploy gr-${{ env.SLUG }}@gr.lab.ayty.org "gr-docker network inspect dados"
 
       - name: Verificar API
         run: |
@@ -83,13 +81,16 @@ jobs:
         run: |
           for i in {1..12}; do
             echo "Tentativa $i de 12..."
+
             if curl --fail --silent --show-error \
               "http://gr.lab.ayty.org:${{ env.PORTA }}/api/pokemons"; then
               echo "Listagem respondeu corretamente!"
               exit 0
             fi
+
             echo "Ainda não respondeu. Aguardando 5 segundos..."
             sleep 5
           done
+
           echo "A aplicação não respondeu após 60 segundos."
           exit 1
